@@ -1,0 +1,10 @@
+[package]
+name = "shootem"
+version = "0.1.0"
+authors = ["Richard Dodd <richard.dodd@itp-group.co.uk>"]
+description = "A simple example game written using amethyst, typical FPS"
+
+[dependencies]
+pretty_env_logger = "0.2"
+genmesh = "0.5"
+amethyst = { path = "../amethyst" }
