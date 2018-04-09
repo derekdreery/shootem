@@ -8,3 +8,4 @@ description = "A simple example game written using amethyst, typical FPS"
 pretty_env_logger = "0.2"
 genmesh = "0.5"
 amethyst = { path = "../amethyst" }
+log = "*"

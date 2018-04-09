@@ -2,19 +2,22 @@
 
 extern crate amethyst;
 
-use amethyst::{Application, Error, State, Trans};
-use amethyst::assets::Loader;
+use amethyst::assets::{Loader, Handle};
 use amethyst::config::Config;
 use amethyst::controls::{FlyControlBundle, FlyControlTag};
 use amethyst::core::cgmath::{Deg, Vector3};
 use amethyst::core::frame_limiter::FrameRateLimitStrategy;
-use amethyst::core::transform::{GlobalTransform, Transform, TransformBundle};
+use amethyst::core::transform::{GlobalTransform, Transform, TransformBundle, Parent};
 use amethyst::ecs::World;
 use amethyst::input::InputBundle;
-use amethyst::renderer::{AmbientColor, PointLight, Light, Camera, DisplayConfig, DrawShaded, ElementState, Event,
-                         KeyboardInput, Material, MaterialDefaults, MeshHandle, ObjFormat,
-                         Pipeline, PosNormTex, Projection, RenderBundle, Rgba, Stage,
-                         VirtualKeyCode, WindowEvent};
+use amethyst::renderer::{AmbientColor, Camera, DisplayConfig, DrawShaded, ElementState, Event,
+                         KeyboardInput, Light, Material, MaterialDefaults, MeshHandle, ObjFormat,
+                         Pipeline, PointLight, PosNormTex, Projection, RenderBundle, Rgba, Stage,
+                         VirtualKeyCode, WindowEvent, TextureHandle};
+use amethyst::ui::{Anchor, Anchored, FontAsset, UiText, UiTransform, TtfFormat, UiBundle,
+    Stretched, Stretch, DrawUi, UiImage};
+use amethyst::utils::fps_counter::FPSCounterBundle;
+use amethyst::{Application, Error, State, Trans};
 
 struct ExampleState;
 
@@ -34,15 +37,50 @@ impl State for ExampleState {
             .with(trans)
             .with(GlobalTransform::default())
             .build();
+        // debug data
+        let debug_background = world
+            .create_entity()
+            .with(UiTransform::new(
+                "debug_background".to_string(),
+                0.0,
+                0.0,
+                0.0,
+                200.0,
+                300.0,
+                0,
+            ))
+            .with(UiImage {
+                texture: assets.debug_background.clone(),
+            })
+            .with(Anchored::new(Anchor::TopLeft))
+            .build();
+        world
+            .create_entity()
+            .with(
+                UiTransform::new("debug_data".to_string(), 1.0, 1.0, -1.0, 20.0, 20.0, 0)
+                    .as_percent(),
+            )
+            .with(Stretched::new(Stretch::XY, 5.0, 5.0))
+            .with(Parent {
+                entity: debug_background
+            })
+            .with(UiImage {
+                texture: assets.debug_background.clone(),
+            })
+            .with(UiText::new(
+                assets.debug_font.clone(),
+                "Hello world!".to_string(),
+                [1.0, 1.0, 1.0, 1.0],
+                12.,
+            ))
+            .build();
 
         let directional_light: Light = PointLight {
             center: [0.0; 3],
             color: Rgba::red(),
             ..Default::default()
         }.into();
-        world.create_entity()
-            .with(directional_light)
-            .build();
+        world.create_entity().with(directional_light).build();
 
         world.add_resource(AmbientColor(Rgba::from([0.1; 3])));
     }
@@ -68,16 +106,23 @@ impl State for ExampleState {
         }
         Trans::None
     }
+
+    fn update(&mut self, world: &mut World) -> Trans {
+        Trans::None
+    }
 }
 
 struct Assets {
     cube: MeshHandle,
     red: Material,
+    debug_background: TextureHandle,
+    debug_font: Handle<FontAsset>,
 }
 
 fn load_assets(world: &World) -> Assets {
     let mesh_storage = world.read_resource();
     let tex_storage = world.read_resource();
+    let font_storage = world.read_resource();
     let mat_defaults = world.read_resource::<MaterialDefaults>();
     let loader = world.read_resource::<Loader>();
 
@@ -86,10 +131,24 @@ fn load_assets(world: &World) -> Assets {
         albedo: red,
         ..mat_defaults.0.clone()
     };
+    let debug_font = loader.load(
+        "DroidSansMono.ttf",
+        TtfFormat,
+        Default::default(),
+        (),
+        &font_storage,
+    );
 
-    let cube = loader.load("mesh/person_man_muscular.obj", ObjFormat, (), (), &mesh_storage);
+    let debug_background = loader.load_from_data([0.0, 0.0, 0.0, 0.6].into(), (), &tex_storage);
+    let cube = loader.load(
+        "mesh/person_man_muscular.obj",
+        ObjFormat,
+        (),
+        (),
+        &mesh_storage,
+    );
 
-    Assets { cube, red }
+    Assets { cube, red, debug_background, debug_font }
 }
 
 /// Wrapper around the main, so we can return errors easily.
@@ -103,15 +162,13 @@ pub fn run() -> Result<(), Error> {
 
     let display_config = DisplayConfig::load(display_config_path);
 
-    let key_bindings_path = format!(
-        "{}/resources/input.ron",
-        env!("CARGO_MANIFEST_DIR")
-    );
+    let key_bindings_path = format!("{}/resources/input.ron", env!("CARGO_MANIFEST_DIR"));
 
     let pipeline_builder = Pipeline::build().with_stage(
         Stage::with_backbuffer()
             .clear_target([0.0, 0.0, 0.0, 1.0], 1.0)
-            .with_pass(DrawShaded::<PosNormTex>::new()),
+            .with_pass(DrawShaded::<PosNormTex>::new())
+            .with_pass(DrawUi::new())
     );
     let mut game = Application::build(resources_directory, ExampleState)?
         .with_frame_limit(FrameRateLimitStrategy::Unlimited, 0)
@@ -125,6 +182,8 @@ pub fn run() -> Result<(), Error> {
             InputBundle::<String, String>::new().with_bindings_from_file(&key_bindings_path),
         )?
         .with_bundle(RenderBundle::new(pipeline_builder, Some(display_config)))?
+        .with_bundle(UiBundle::<String, String>::new())?
+        .with_bundle(FPSCounterBundle::default())?
         .build()?;
     game.run();
     Ok(())

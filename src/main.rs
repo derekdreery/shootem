@@ -1,8 +1,9 @@
 //! Demonstrates how to use the fly camera
 
 extern crate amethyst;
-extern crate pretty_env_logger;
 extern crate genmesh;
+extern crate pretty_env_logger;
+#[macro_use] extern crate log;
 
 mod game_state;
 
@@ -13,7 +14,7 @@ fn main() {
     // Turn logging on by default
     match env::var("RUST_LOG") {
         Err(env::VarError::NotPresent) => {
-            env::set_var("RUST_LOG", "info,gfx_device_gl=warn");
+            env::set_var("RUST_LOG", "info,gfx_device_gl=warn,amethyst_assets=debug");
         }
         _ => (),
     }

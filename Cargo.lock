@@ -165,6 +165,7 @@ dependencies = [
  "gfx 0.17.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "gfx_glyph 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hibitset 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusttype 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "shrev 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "unicode-normalization 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1309,6 +1310,7 @@ version = "0.1.0"
 dependencies = [
  "amethyst 0.6.0",
  "genmesh 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "pretty_env_logger 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
