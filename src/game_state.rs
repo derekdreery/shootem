@@ -8,7 +8,7 @@ use amethyst::controls::{FlyControlBundle, FlyControlTag};
 use amethyst::core::cgmath::{Deg, Vector3};
 use amethyst::core::frame_limiter::FrameRateLimitStrategy;
 use amethyst::core::transform::{GlobalTransform, Transform, TransformBundle, Parent};
-use amethyst::ecs::World;
+use amethyst::ecs::{World, Component, NullStorage, Fetch, System, ReadStorage, WriteStorage, Join};
 use amethyst::input::InputBundle;
 use amethyst::renderer::{AmbientColor, Camera, DisplayConfig, DrawShaded, ElementState, Event,
                          KeyboardInput, Light, Material, MaterialDefaults, MeshHandle, ObjFormat,
@@ -16,10 +16,31 @@ use amethyst::renderer::{AmbientColor, Camera, DisplayConfig, DrawShaded, Elemen
                          VirtualKeyCode, WindowEvent, TextureHandle};
 use amethyst::ui::{Anchor, Anchored, FontAsset, UiText, UiTransform, TtfFormat, UiBundle,
     Stretched, Stretch, DrawUi, UiImage};
-use amethyst::utils::fps_counter::FPSCounterBundle;
+use amethyst::utils::fps_counter::{FPSCounterBundle, FPSCounter};
 use amethyst::{Application, Error, State, Trans};
 
 struct ExampleState;
+
+#[derive(Debug, Default)]
+struct DebugDisplay;
+
+impl Component for DebugDisplay {
+    type Storage = NullStorage<Self>;
+}
+
+struct DebugSystem;
+
+impl<'a> System<'a> for DebugSystem {
+    type SystemData = (ReadStorage<'a, DebugDisplay>,
+                       WriteStorage<'a, UiText>,
+                       Fetch<'a, FPSCounter>);
+
+    fn run(&mut self, (flag, mut text, counter): Self::SystemData) {
+        for (_, text) in (&flag, &mut text).join() {
+            text.text = format!("fps: {:.2}", counter.sampled_fps())
+        }
+    }
+}
 
 impl State for ExampleState {
     fn on_start(&mut self, world: &mut World) {
@@ -57,15 +78,12 @@ impl State for ExampleState {
         world
             .create_entity()
             .with(
-                UiTransform::new("debug_data".to_string(), 1.0, 1.0, -1.0, 20.0, 20.0, 0)
+                UiTransform::new("debug_data".to_string(), 100.0, 150.0, -1.0, 200.0, 300.0, 0)
                     .as_percent(),
             )
             .with(Stretched::new(Stretch::XY, 5.0, 5.0))
             .with(Parent {
                 entity: debug_background
-            })
-            .with(UiImage {
-                texture: assets.debug_background.clone(),
             })
             .with(UiText::new(
                 assets.debug_font.clone(),
@@ -73,6 +91,7 @@ impl State for ExampleState {
                 [1.0, 1.0, 1.0, 1.0],
                 12.,
             ))
+            .with(DebugDisplay)
             .build();
 
         let directional_light: Light = PointLight {
@@ -151,18 +170,22 @@ fn load_assets(world: &World) -> Assets {
     Assets { cube, red, debug_background, debug_font }
 }
 
+const CARGO_MANIFEST_DIR: &'static str = env!("CARGO_MANIFEST_DIR");
+
 /// Wrapper around the main, so we can return errors easily.
 pub fn run() -> Result<(), Error> {
-    let resources_directory = format!("{}/resources", env!("CARGO_MANIFEST_DIR"));
+    use std::path::Path;
 
-    let display_config_path = format!(
-        "{}/resources/display_config.ron",
-        env!("CARGO_MANIFEST_DIR")
-    );
-
+    let root_dir = if ::std::env::var("CARGO").is_ok() {
+        Path::new(CARGO_MANIFEST_DIR)
+    } else {
+        Path::new(".")
+    };
+    let resources_directory = root_dir.join("resources");
+    let display_config_path = resources_directory.join("display_config.ron");
+    let key_bindings_path = resources_directory.join("input.ron");
     let display_config = DisplayConfig::load(display_config_path);
 
-    let key_bindings_path = format!("{}/resources/input.ron", env!("CARGO_MANIFEST_DIR"));
 
     let pipeline_builder = Pipeline::build().with_stage(
         Stage::with_backbuffer()
@@ -171,6 +194,7 @@ pub fn run() -> Result<(), Error> {
             .with_pass(DrawUi::new())
     );
     let mut game = Application::build(resources_directory, ExampleState)?
+        .register::<DebugDisplay>()
         .with_frame_limit(FrameRateLimitStrategy::Unlimited, 0)
         .with_bundle(FlyControlBundle::<String, String>::new(
             Some(String::from("move_x")),
@@ -184,6 +208,7 @@ pub fn run() -> Result<(), Error> {
         .with_bundle(RenderBundle::new(pipeline_builder, Some(display_config)))?
         .with_bundle(UiBundle::<String, String>::new())?
         .with_bundle(FPSCounterBundle::default())?
+        .with(DebugSystem, "debug_system", &[])
         .build()?;
     game.run();
     Ok(())
